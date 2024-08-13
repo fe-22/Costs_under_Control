@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FinFusion - Financial Data Input</title>
+    <style>
+        /* CSS de exemplo */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        label, input, select {
+            margin: 10px 0;
+            width: 100%;
+            max-width: 500px;
+        }
+        button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #financial-summary {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .alert {
+            color: red;
+            font-weight: bold;
+        }
+        .investment-form {
+            display: none;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FinFusion - Financial Data Input</h1>
+        <form action="" method="post">
+            <label for="date">Data:</label>
+            <input type="date" id="date" name="date" required>
+
+            <label for="description">Descrição:</label>
+            <input type="text" id="description" name="description" required>
+
+            <label for="amount">Quantia:</label>
+            <input type="number" step="0.01" id="amount" name="amount" required>
+
+            <label for="type">Tipo:</label>
+            <select id="type" name="type" required>
+                <option value="renda">Renda</option>
+                <option value="despesa">Despesa</option>
+            </select>
+
+            <button type="submit">Adicionar</button>
+        </form>
+
+        {% if data %}
+        <h2>Dados:</h2>
+        <table class="data-table">
+            <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Quantia</th>
+                <th>Tipo</th>
+            </tr>
+            {% for entry in data %}
+            <tr>
+                <td>{{ entry.date }}</td>
+                <td>{{ entry.description }}</td>
+                <td>{{ entry.amount }}</td>
+                <td>{{ entry.type }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <h2>Resumo financeiro:</h2>
+        <div id="financial-summary">
+            <p>Renda Total: <span id="total-income">0,00</span></p>
+            <p>Despesas totais: <span id="total-expenses">0,00</span></p>
+            <p>Saldo líquido: <span id="net-balance">0,00</span></p>
+            <h3>Maiores custos:</h3>
+            <ul id="highest-costs"></ul>
+
+            <h3>Comparativo com o mês anterior:</h3>
+            <p>Saldo do mês anterior: <span id="last-month-balance">0,00</span></p>
+            <p>Saldo do mês atual: <span id="current-month-balance">0,00</span></p>
+            <p>Diferença: <span id="balance-difference">0,00</span></p>
+            <p id="alert-message" class="alert"></p>
+        </div>
+
+        <div id="investment-form" class="investment-form">
+            <h2>Calculadora de Aplicações</h2>
+            <form>
+                <label for="investment-amount">Quantia para investir:</label>
+                <input type="number" step="0.01" id="investment-amount" name="investment-amount" required>
+                
+                <label for="interest-rate">Taxa de juros anual (%):</label>
+                <input type="number" step="0.01" id="interest-rate" name="interest-rate" required>
+                
+                <label for="investment-period">Período de investimento (anos):</label>
+                <input type="number" step="1" id="investment-period" name="investment-period" required>
+                
+                <button type="button" onclick="calculateInvestment()">Calcular</button>
+            </form>
+            <p>Valor futuro: <span id="future-value">0,00</span></p>
+        </div>
+
+        {% endif %}
+
+        {% if message %}
+        <p>{{ message }}</p>
+        {% endif %}
+    </div>
+
+    <script>
+        // Função para formatar números em moeda
+        function formatCurrency(value) {
+            return value.toFixed(2).replace('.', ',');
+        }
+
+        // Função para calcular valor futuro de uma aplicação
+        function calculateInvestment() {
+            const amount = parseFloat(document.getElementById('investment-amount').value);
+            const rate = parseFloat(document.getElementById('interest-rate').value) / 100;
+            const period = parseInt(document.getElementById('investment-period').value);
+            
+            const futureValue = amount * Math.pow((1 + rate), period);
+            document.getElementById('future-value').textContent = formatCurrency(futureValue);
+        }
+
+        // Obtém as linhas da tabela de dados
+        const tableRows = document.querySelectorAll('.data-table tr');
+
+        // Inicializa variáveis para armazenar renda, despesas e maiores custos
+        let totalIncome = 0;
+        let totalExpenses = 0;
+        let highestCosts = [];
+
+        // Variáveis para armazenar dados mensais
+        let monthlyData = {};
+        let currentMonth = new Date().getMonth() + 1;
+        let currentYear = new Date().getFullYear();
+
+        // Loop através de cada linha da tabela
+        tableRows.forEach((row, index) => {
+            if (index === 0) return; // Pula o cabeçalho da tabela
+
+            const amount = parseFloat(row.cells[2].textContent);
+            const type = row.cells[3].textContent;
+            const date = new Date(row.cells[0].textContent);
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+
+            // Inicializa dados mensais se necessário
+            if (!monthlyData[year]) {
+                monthlyData[year] = {};
+            }
+            if (!monthlyData[year][month]) {
+                monthlyData[year][month] = { income: 0, expenses: 0 };
+            }
+
+            // Atualiza renda ou despesas com base no tipo
+            if (type === 'renda') {
+                totalIncome += amount;
+                monthlyData[year][month].income += amount;
+            } else {
+                totalExpenses += amount;
+                monthlyData[year][month].expenses += amount;
+            }
+
+            // Atualiza o array de maiores custos
+            highestCosts.push({ amount, description: row.cells[1].textContent });
+        });
+
+        // Calcula o saldo líquido
+        const netBalance = totalIncome - totalExpenses;
+
+        // Exibe os resultados calculados
+        document.getElementById('total-income').textContent = formatCurrency(totalIncome);
+        document.getElementById('total-expenses').textContent = formatCurrency(totalExpenses);
+        document.getElementById('net-balance').textContent = formatCurrency(netBalance);
+
+        // Exibe os maiores custos
+        highestCosts.sort((a, b) => b.amount - a.amount);
+        highestCosts.slice(0, 5).forEach((cost) => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${cost.description}: ${formatCurrency(cost.amount)}`;
+            document.getElementById('highest-costs').appendChild(listItem);
+        });
+
+        // Calcula e exibe o saldo do mês atual e do mês anterior
+        const currentMonthData = monthlyData[currentYear][currentMonth] || { income: 0, expenses: 0 };
+        const currentMonthBalance = currentMonthData.income - currentMonthData.expenses;
+
+        let lastMonth = currentMonth - 1;
+        let lastYear = currentYear;
+        if (lastMonth === 0) {
+            lastMonth = 12;
+            lastYear -= 1;
+        }
+        const lastMonthData = monthlyData[lastYear] ? monthlyData[lastYear][lastMonth] : { income: 0, expenses: 0 };
+        const lastMonthBalance = lastMonthData ? (lastMonthData.income - lastMonthData.expenses) : 0;
+
+        const balanceDifference = currentMonthBalance - lastMonthBalance;
+
+        document.getElementById('last-month-balance').textContent = formatCurrency(lastMonthBalance);
+        document.getElementById('current-month-balance').textContent = formatCurrency(currentMonthBalance);
+        document.getElementById('balance-difference').textContent = formatCurrency(balanceDifference);
+
+        // Exibe alerta e calcula juros se o saldo for negativo
+        if (currentMonthBalance < 0) {
+            const interest = Math.abs(currentMonthBalance) * 0.08;
+            document.getElementById('alert-message').textContent = `Cuidado! Você entrou no cheque especial. Juros de 8%: ${formatCurrency(interest)}`;
+        } else {
+            // Exibe formulário de investimentos se o saldo for positivo
+            document.getElementById('investment-form').style.display = 'block';
+        }
+    </script>
+    <footer>
+        <p>&copy; 2024 ftech. Todos os direitos reservados.</p>
+        <p><a href="https://github.com/" style="color:bleck; text-decoration: none;">chave_pix11982170425 Ajude a desenvolver soluções para melhorar sua vida.</a></p>
+    </footer>
+</body>
+</html>
