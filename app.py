@@ -145,20 +145,19 @@ def add_footer():
     st.markdown(
         """
         <style>
-         .footer {
+        .footer {
             position: fixed;
             bottom: 0;
             width: 100%;
             background-color: #0000FF;
             color: white;
-            text-align: center;
-            padding: 8px;
-            font-size: 10px;
+            text-align: left;
+            padding: 2px; /* Ajuste da altura */
+            font-size: 12px;
         }
         </style>
         <div class="footer">
-            <p>App construído por @fthec | Contato: fernandoalexthec@gmail.com</p>
-            <p>Chave pix:11982170425</p>
+            <p>App construído por @fthec | Contato: fernandoalexthec@gmail.com | Chave Pix: 11982170425</p>
         </div>
         """,
         unsafe_allow_html=True
