@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import time
 import yfinance as yf
 import matplotlib.pyplot as plt
+import requests
 
 # Funções de utilidade
 def hash_password(password):
@@ -88,7 +89,39 @@ def add_financial_data(username, date, description, amount, type, payment_method
         c.execute("INSERT INTO financial_data (username, date, description, amount, type, payment_method, installments, necessity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (username, date, description, amount, type, payment_method, installments, necessity))
         conn.commit()
+        
+def obter_preco_atual(crypto='bitcoin', max_retries=3):
+    url = f'https://api.coingecko.com/api/v3/simple/price?ids={crypto}&vs_currencies=usd'
+    
+    for attempt in range(max_retries):
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if crypto in data and 'usd' in data[crypto]:
+                return data[crypto]['usd']
+            else:
+                st.warning(f"Tentativa {attempt + 1}: Chave '{crypto}' ou 'usd' não encontrada na resposta.")
+        else:
+            st.warning(f"Tentativa {attempt + 1}: Falha ao conectar com a API (Status Code: {response.status_code}).")
+        time.sleep(2)
 
+    st.error(f"Erro: Não foi possível obter o preço do {crypto.capitalize()} após várias tentativas.")
+    return None
+
+def verificar_venda(preco_compra, quantidade, crypto='bitcoin'):
+    preco_atual = obter_preco_atual(crypto)
+    
+    if preco_atual is None:
+        return "Não foi possível obter o preço atual da criptomoeda."
+
+    valor_investido = preco_compra * quantidade
+    valor_atual = preco_atual * quantidade
+
+    if valor_atual > valor_investido:
+        return f"Preço atual do {crypto.capitalize()}: ${preco_atual:.2f}. Lucro obtido: ${valor_atual - valor_investido:.2f}. Recomenda-se vender."
+    else:
+        return f"Preço atual do {crypto.capitalize()}: ${preco_atual:.2f}. Valor atual menor que o investido: ${valor_investido - valor_atual:.2f}. Recomenda-se esperar."
+    
 def remove_financial_data(ids):
     with sqlite3.connect('finfusion.db') as conn:
         c = conn.cursor()
@@ -112,6 +145,15 @@ def display_major_expenses(username):
     if not data:
         st.warning('Nenhum dado financeiro disponível.')
         return
+
+    df = pd.DataFrame(data, columns=['id', 'Data', 'Descrição', 'Quantia', 'Tipo', 'Método de Pagamento', 'Parcelas', 'Necessidade'])
+    major_expenses = df[df['Tipo'] == 'Despesa'].sort_values(by='Quantia', ascending=False)
+    st.subheader('Maiores Gastos')
+    st.dataframe(major_expenses)
+
+    non_essential_expenses = df[(df['Necessidade'] == 'Não essencial') & (df['Tipo'] == 'Despesa')]
+    st.subheader('Gastos Não Essenciais')
+    st.dataframe(non_essential_expenses)
 
 def alert_overdraft_and_credit(username):
     """Exibe alertas para cheque especial e gastos excessivos no cartão de crédito."""
@@ -223,7 +265,18 @@ def insert_data_page():
         if df is not None:
             st.dataframe(df)  # Exibe os dados carregados
 
+    st.subheader("Negociação de Criptomoedas")
+    crypto_symbol = st.text_input("Digite o símbolo da criptomoeda (ex: bitcoin, ethereum)", value='bitcoin')
+    purchase_price = st.number_input("Preço de Compra", min_value=0.0, format="%.2f")
+    quantity = st.number_input("Quantidade", min_value=0.0, format="%.2f")
+    check_button = st.button("Verificar Venda")
+
+    if check_button:
+        result = verificar_venda(purchase_price, quantity, crypto_symbol)
+        st.write(result)
+
     add_footer()
+
 
 def financial_data_page():
     st.title('Dados Financeiros')
