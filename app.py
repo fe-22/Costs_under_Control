@@ -89,39 +89,7 @@ def add_financial_data(username, date, description, amount, type, payment_method
         c.execute("INSERT INTO financial_data (username, date, description, amount, type, payment_method, installments, necessity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (username, date, description, amount, type, payment_method, installments, necessity))
         conn.commit()
-        
-def obter_preco_atual(crypto='bitcoin', max_retries=3):
-    url = f'https://api.coingecko.com/api/v3/simple/price?ids={crypto}&vs_currencies=usd'
-    
-    for attempt in range(max_retries):
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if crypto in data and 'usd' in data[crypto]:
-                return data[crypto]['usd']
-            else:
-                st.warning(f"Tentativa {attempt + 1}: Chave '{crypto}' ou 'usd' não encontrada na resposta.")
-        else:
-            st.warning(f"Tentativa {attempt + 1}: Falha ao conectar com a API (Status Code: {response.status_code}).")
-        time.sleep(2)
 
-    st.error(f"Erro: Não foi possível obter o preço do {crypto.capitalize()} após várias tentativas.")
-    return None
-
-def verificar_venda(preco_compra, quantidade, crypto='bitcoin'):
-    preco_atual = obter_preco_atual(crypto)
-    
-    if preco_atual is None:
-        return "Não foi possível obter o preço atual da criptomoeda."
-
-    valor_investido = preco_compra * quantidade
-    valor_atual = preco_atual * quantidade
-
-    if valor_atual > valor_investido:
-        return f"Preço atual do {crypto.capitalize()}: ${preco_atual:.2f}. Lucro obtido: ${valor_atual - valor_investido:.2f}. Recomenda-se vender."
-    else:
-        return f"Preço atual do {crypto.capitalize()}: ${preco_atual:.2f}. Valor atual menor que o investido: ${valor_investido - valor_atual:.2f}. Recomenda-se esperar."
-    
 def remove_financial_data(ids):
     with sqlite3.connect('finfusion.db') as conn:
         c = conn.cursor()
@@ -245,27 +213,6 @@ def sidebar_navigation():
         remove_data_page()
     elif page == "Análises e Gráficos":
         analysis_page()
-    else:
-        # Formulário de login
-        st.subheader('Login')
-        username = st.text_input('Usuário')
-        password = st.text_input('Senha', type='password')
-        if st.button('Entrar'):
-            if verify_password(username, password):
-                st.session_state['username'] = username
-                st.session_state['logged_in'] = True
-            else:
-                st.error('Nome de usuário ou senha incorretos.')
-
-        # Formulário de registro
-        st.subheader('Registrar')
-        new_username = st.text_input('Novo Usuário')
-        new_password = st.text_input('Nova Senha', type='password')
-        if st.button('Registrar'):
-            register_user(new_username, new_password)
-            st.success('Usuário registrado com sucesso!')
-            
-    add_footer()
 
 def insert_data_page():
     st.title("Inserir Dados Financeiros")
@@ -280,158 +227,47 @@ def insert_data_page():
         payment_method = st.selectbox("Método de Pagamento", ["Dinheiro", "Cartão de Crédito", "Cartão de Débito", "Transferência"])
         installments = st.number_input("Parcelas", min_value=1, max_value=12, value=1)
         necessity = st.selectbox("Necessidade", ["Essencial", "Não essencial"])
-        submit_button = st.form_submit_button("Adicionar")
 
-    if submit_button:
-        add_financial_data(username, date, description, amount, type, payment_method, installments, necessity)
-        st.success("Dados adicionados com sucesso!")
-
-    # Adiciona o campo de upload de Excel
-    uploaded_file = st.file_uploader("Escolha uma planilha Excel", type=["xlsx"])
-    if uploaded_file is not None:
-        df = upload_excel(uploaded_file)
-        if df is not None:
-            st.dataframe(df)  # Exibe os dados carregados
-
-    st.subheader("Negociação de Criptomoedas")
-    crypto_symbol = st.text_input("Digite o símbolo da criptomoeda (ex: bitcoin, ethereum)", value='bitcoin')
-    purchase_price = st.number_input("Preço de Compra", min_value=0.0, format="%.2f")
-    quantity = st.number_input("Quantidade", min_value=0.0, format="%.2f")
-    check_button = st.button("Verificar Venda")
-
-    if check_button:
-        result = verificar_venda(purchase_price, quantity, crypto_symbol)
-        st.write(result)
-
-    add_footer()
-
+        submitted = st.form_submit_button("Adicionar Dados")
+        if submitted:
+            add_financial_data(username, date, description, amount, type, payment_method, installments, necessity)
+            st.success("Dados adicionados com sucesso!")
 
 def financial_data_page():
-    st.title('Dados Financeiros')
+    st.title("Dados Financeiros")
 
     username = st.session_state['username']
-
-    financial_data = get_financial_data(username)
-    if len(financial_data) == 0:
-        st.warning('Nenhum dado financeiro disponível.')
-        return
-
-    st.subheader('Dados Financeiros')
-    df = pd.DataFrame(financial_data, columns=['id', 'Data', 'Descrição', 'Quantia', 'Tipo', 'Método de Pagamento', 'Parcelas', 'Necessidade'])
-    st.table(df.drop(columns=['id']))
-
-    display_major_expenses(username)
-    alert_overdraft_and_credit(username)
-
-    add_footer()
+    data = get_financial_data(username)
+    if data:
+        df = pd.DataFrame(data, columns=["ID", "Data", "Descrição", "Quantia", "Tipo", "Método de Pagamento", "Parcelas", "Necessidade"])
+        st.dataframe(df)
+    else:
+        st.warning("Nenhum dado financeiro disponível.")
 
 def remove_data_page():
     st.title("Remover Dados Financeiros")
 
     username = st.session_state['username']
+    data = get_financial_data(username)
 
-    financial_data = get_financial_data(username)
-    if len(financial_data) == 0:
-        st.warning('Nenhum dado financeiro disponível para remoção.')
-        return
+    if data:
+        df = pd.DataFrame(data, columns=["ID", "Data", "Descrição", "Quantia", "Tipo", "Método de Pagamento", "Parcelas", "Necessidade"])
+        st.dataframe(df)
 
-    st.subheader('Selecione os dados para remover')
-    df = pd.DataFrame(financial_data, columns=['id', 'Data', 'Descrição', 'Quantia', 'Tipo', 'Método de Pagamento', 'Parcelas', 'Necessidade'])
-    df = df.drop(columns=['id'])  # Remove a coluna 'id' para exibição
-    selected_rows = st.multiselect('Escolha os dados a serem removidos', df.index, format_func=lambda x: f"{df.loc[x, 'Descrição']} - {format_currency(df.loc[x, 'Quantia'])}")
-
-    if st.button('Remover selecionados'):
-        if selected_rows:
-            ids_to_remove = [financial_data[i][0] for i in selected_rows]
+        ids_to_remove = st.multiselect("Selecione os IDs para remover", df["ID"].tolist())
+        if st.button("Remover Dados"):
             remove_financial_data(ids_to_remove)
-            st.success(f'Dados removidos com sucesso!')
-            st.stop()  # Interrompe a execução para evitar a continuação do código, o que efetivamente recarrega a página.
-        else:
-            st.warning("Selecione ao menos um dado para remover.")
-
-    add_footer()
+            st.success("Dados removidos com sucesso!")
+            st.experimental_rerun()
+    else:
+        st.warning("Nenhum dado financeiro disponível.")
 
 def analysis_page():
     st.title("Análises e Gráficos")
-    st.write("Aqui você pode visualizar gráficos e análises financeiras.")
 
-    st.subheader("Análise financeira")
-    df_example = pd.DataFrame({
-        'Data': pd.date_range(start='2024-08-01', periods=100),
-        'Valor': np.random.randn(100).cumsum()
-    }).set_index('Data')
-    
-    fig, ax = plt.subplots()
-    ax.plot(df_example.index, df_example['Valor'])
-    ax.set_title("Gastos")
-    ax.set_xlabel("Data")
-    ax.set_ylabel("Valor")
-    ax.grid(color='gray', linestyle='--', linewidth=0.5)
-    ax.set_facecolor('black')
-    fig.patch.set_facecolor('black')
-    ax.tick_params(axis='both', colors='white')
-    ax.xaxis.label.set_color('white')
-    ax.yaxis.label.set_color('white')
-    ax.title.set_color('white')
-    
-    st.pyplot(fig)
+    username = st.session_state['username']
+    display_major_expenses(username)
+    alert_overdraft_and_credit(username)
 
-    st.subheader('Evolução do Bitcoin, Ethereum, IBOVESPA e NASDAQ')
-    
-    end_date = datetime.today()
-    start_date = end_date - timedelta(days=180)
-    
-    symbols = {'Bitcoin': 'BTC-USD', 'Ethereum': 'ETH-USD', 'IBOVESPA': '^BVSP', 'NASDAQ': '^IXIC'}
-    data = {}
-    
-    for name, symbol in symbols.items():
-        data[name] = yf.download(symbol, start=start_date, end=end_date)
-    
-    for name, df in data.items():
-        fig, ax = plt.subplots()
-        ax.plot(df.index, df['Close'])
-        ax.set_title(f'Evolução do {name}')
-        ax.set_xlabel('Data')
-        ax.set_ylabel('Preço de Fechamento')
-        ax.grid(color='gray', linestyle='--', linewidth=0.5)
-        ax.set_facecolor('black')
-        fig.patch.set_facecolor('black')
-        ax.tick_params(axis='both', colors='white')
-        ax.xaxis.label.set_color('white')
-        ax.yaxis.label.set_color('white')
-        ax.title.set_color('white')
-        
-        st.pyplot(fig)
-
-    st.subheader('Sugestões de Compra')
-    for name, df in data.items():
-        current_price = df['Close'].iloc[-1]
-        st.write(f'Preço atual do {name}: {format_currency(current_price)}')
-        if current_price < df['Close'].mean():
-            st.write(f'Sugestão: Pode ser uma boa hora para comprar {name}.')
-        else:
-            st.write(f'Sugestão: Espere uma possível queda no preço de {name} antes de comprar.')
-
-# Função para navegação do sidebar
-def sidebar_navigation():
-    st.sidebar.title("Navegação")
-    page = st.sidebar.selectbox("Escolha uma página", ["Inserir Dados", "Dados Financeiros", "Remover Dados", "Análises e Gráficos"])
-
-    if page == "Inserir Dados":
-        insert_data_page()
-    elif page == "Dados Financeiros":
-        financial_data_page()
-    elif page == "Remover Dados":
-        remove_data_page()
-    elif page == "Análises e Gráficos":
-        analysis_page()
-
-# Inicializar a aplicação
-if __name__ == '__main__':
-    if 'username' not in st.session_state:
-        st.session_state['username'] = None
-    if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = False
-
-    create_database()
-    home()
+# Inicia o app
+home()
